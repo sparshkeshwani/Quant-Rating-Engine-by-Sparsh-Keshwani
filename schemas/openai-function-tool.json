@@ -1,0 +1,59 @@
+{
+  "type": "function",
+  "function": {
+    "name": "compute_qrce_equity_rating",
+    "description": "Calculates the deterministic Composite Quant Score (CQS in [-100, +100]) and renders the QRCE v3.0.0 institutional rating report by Sparsh Keshwani.",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ticker",
+        "company_name",
+        "regime",
+        "s_fin",
+        "s_grw",
+        "s_val",
+        "s_sen",
+        "s_rsk",
+        "xbrl_divergence_penalty",
+        "consensus_modifier",
+        "insider_status",
+        "short_interest_high",
+        "options_flow",
+        "macro_filter"
+      ],
+      "properties": {
+        "ticker": { "type": "string" },
+        "company_name": { "type": "string" },
+        "regime": {
+          "type": "string",
+          "enum": ["baseline", "high_rate", "bull_growth", "stagflation"]
+        },
+        "s_fin": { "type": "number", "description": "Financial Health & Solvency [-100, 100]" },
+        "s_grw": { "type": "number", "description": "Growth Momentum & Guidance [-100, 100]" },
+        "s_val": { "type": "number", "description": "Sector-Relative Valuation [-100, 100]" },
+        "s_sen": { "type": "number", "description": "Sentiment & Catalyst Velocity [-100, 100]" },
+        "s_rsk": { "type": "number", "description": "Risk, Debt & Governance [-100, 100]" },
+        "xbrl_divergence_penalty": { "type": "boolean" },
+        "consensus_modifier": {
+          "type": "string",
+          "enum": ["none", "beat_gt_5", "miss_gt_3"]
+        },
+        "insider_status": {
+          "type": "string",
+          "enum": ["neutral", "divergence_sell_5m", "alignment_buy_500k"]
+        },
+        "short_interest_high": { "type": "boolean" },
+        "options_flow": {
+          "type": "string",
+          "enum": ["neutral", "bearish_pcr_gt_1_5", "bullish_pcr_lt_0_6_darkpool"]
+        },
+        "macro_filter": {
+          "type": "string",
+          "enum": ["none", "cyclical_downside", "defensive_bonus"]
+        }
+      }
+    }
+  }
+}

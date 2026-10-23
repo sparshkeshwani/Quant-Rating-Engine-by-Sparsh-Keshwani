@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sparsh-keshwani/qrce-skill/schemas/qrce-output.schema.json",
+  "title": "QRCEOutputReport",
+  "description": "Structured output schema for Sparsh Keshwani's Quantitative Rating & Conversion Engine (QRCE v3.0.0)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "author",
+    "version",
+    "ticker",
+    "company_name",
+    "macro_regime",
+    "timestamp",
+    "final_rating",
+    "composite_quant_score",
+    "confidence_score_pct",
+    "factor_breakdown",
+    "adjustments",
+    "drivers",
+    "actionable_threshold",
+    "formatted_terminal_report"
+  ],
+  "properties": {
+    "author": {
+      "type": "string",
+      "const": "Sparsh Keshwani"
+    },
+    "version": {
+      "type": "string",
+      "const": "3.0.0"
+    },
+    "ticker": {
+      "type": "string",
+      "description": "Exchange ticker symbol, e.g., NVDA, UNH, INTC"
+    },
+    "company_name": {
+      "type": "string"
+    },
+    "macro_regime": {
+      "type": "string",
+      "enum": [
+        "Baseline Neutral",
+        "High Rate/Inflation",
+        "Bull Growth",
+        "Stagflation/Recession"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "ISO-8601 evaluation timestamp"
+    },
+    "final_rating": {
+      "type": "string",
+      "enum": ["STRONG BUY", "BUY", "HOLD", "SELL", "STRONG SELL"]
+    },
+    "composite_quant_score": {
+      "type": "number",
+      "minimum": -100,
+      "maximum": 100
+    },
+    "confidence_score_pct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "factor_breakdown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fin", "grw", "val", "sen", "rsk"],
+      "properties": {
+        "fin": { "$ref": "#/$defs/factorScore" },
+        "grw": { "$ref": "#/$defs/factorScore" },
+        "val": { "$ref": "#/$defs/factorScore" },
+        "sen": { "$ref": "#/$defs/factorScore" },
+        "rsk": { "$ref": "#/$defs/factorScore" }
+      }
+    },
+    "adjustments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "delta_hard_data",
+        "delta_form4_insider",
+        "delta_options_short_interest",
+        "delta_macro_sector"
+      ],
+      "properties": {
+        "delta_hard_data": { "type": "number", "minimum": -35, "maximum": 10 },
+        "delta_form4_insider": { "type": "number", "enum": [-15, 0, 10] },
+        "delta_options_short_interest": { "type": "number", "minimum": -15, "maximum": 10 },
+        "delta_macro_sector": { "type": "number", "enum": [-10, 0, 10] }
+      }
+    },
+    "drivers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary_bull_factor",
+        "primary_bear_factor",
+        "form4_insider_signal",
+        "critical_catalyst"
+      ],
+      "properties": {
+        "primary_bull_factor": { "type": "string" },
+        "primary_bear_factor": { "type": "string" },
+        "form4_insider_signal": { "type": "string" },
+        "critical_catalyst": { "type": "string" }
+      }
+    },
+    "actionable_threshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stance", "horizon"],
+      "properties": {
+        "stance": {
+          "type": "string",
+          "enum": ["Accumulate", "Hold", "Reduce", "Exit"]
+        },
+        "horizon": {
+          "type": "string"
+        }
+      }
+    },
+    "formatted_terminal_report": {
+      "type": "string",
+      "description": "80-column ASCII terminal block adhering to Section 7 of QRCE v3.0.0"
+    }
+  },
+  "$defs": {
+    "factorScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["weight", "raw_score", "weighted_contribution"],
+      "properties": {
+        "weight": { "type": "number", "minimum": 0.1, "maximum": 0.45 },
+        "raw_score": { "type": "number", "minimum": -100, "maximum": 100 },
+        "weighted_contribution": { "type": "number", "minimum": -45, "maximum": 45 }
+      }
+    }
+  }
+}

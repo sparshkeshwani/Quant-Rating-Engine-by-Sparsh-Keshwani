@@ -1,0 +1,6 @@
+{
+  "name": "QRCE Skill Repository — Quantitative Rating & Conversion Engine",
+  "description": "Official GitHub repository package, multi-LLM prompt studio, and CQS simulator for the Quantitative Rating & Conversion Engine (QRCE v3.0.0) skill by Sparsh Keshwani.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

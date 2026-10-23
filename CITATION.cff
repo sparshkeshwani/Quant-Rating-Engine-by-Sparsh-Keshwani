@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use the Quantitative Rating & Conversion Engine (QRCE) skill or scoring methodology, please cite it as below."
+title: "Quantitative Rating & Conversion Engine (QRCE)"
+version: 3.0.0
+date-released: 2026-10-23
+license: MIT
+type: software
+authors:
+  - family-names: "Keshwani"
+    given-names: "Sparsh"
+keywords:
+  - quantitative-finance
+  - equity-research
+  - llm-skills
+  - system-prompts
+  - sec-edgar
+  - multi-factor-scoring
