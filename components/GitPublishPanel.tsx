@@ -13,9 +13,18 @@ export default function GitPublishPanel({ onDownloadFullZip }: GitPublishPanelPr
   const [repoSlug, setRepoSlug] = useState<string>('qrce-skill');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
   const [copiedCommands, setCopiedCommands] = useState<boolean>(false);
+  const [copiedReadme, setCopiedReadme] = useState<boolean>(false);
 
   const safeOwner = githubOwner.trim() || 'sparsh-keshwani';
   const safeSlug = repoSlug.trim() || 'qrce-skill';
+
+  const readmeContent = REPO_FILES.find((f) => f.path === 'README.md')?.content || '';
+
+  const handleCopyReadme = () => {
+    navigator.clipboard.writeText(readmeContent);
+    setCopiedReadme(true);
+    setTimeout(() => setCopiedReadme(false), 1800);
+  };
 
   const cliScript = [
     `# 1. Unzip the downloaded QRCE v3.1.0 dual-market repository archive`,
@@ -129,6 +138,21 @@ export default function GitPublishPanel({ onDownloadFullZip }: GitPublishPanelPr
                 >
                   <Download className="h-4 w-4" />
                   <span>Download qrce-skill-v3.1.0.zip ({REPO_FILES.length} Files)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyReadme}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-800 transition-colors hover:bg-slate-50 whitespace-nowrap"
+                >
+                  {copiedReadme ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5 text-slate-500" />
+                  )}
+                  <span>
+                    {copiedReadme ? 'Copied Clean README.md' : 'Copy Clean README.md (GitHub-Ready)'}
+                  </span>
                 </button>
 
                 <a

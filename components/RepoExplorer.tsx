@@ -127,7 +127,7 @@ export default function RepoExplorer({ onDownloadFullZip }: RepoExplorerProps) {
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
-            README.md
+            README.md (Tree &amp; Architecture)
           </button>
           <button
             type="button"
@@ -225,7 +225,7 @@ export default function RepoExplorer({ onDownloadFullZip }: RepoExplorerProps) {
               main
             </span>
             <span aria-hidden="true">·</span>
-            <span>Sparsh Keshwani: Release QRCE v3.0.0 Production Grade Multi-LLM Suite</span>
+            <span>Sparsh Keshwani: Release QRCE v3.1.0 Dual-Jurisdiction (NSE/BSE &amp; SEC EDGAR) with Structured Architecture</span>
           </div>
           <div className="flex items-center gap-3 tabular-nums">
             <span>{REPO_FILES.length} files</span>
