@@ -160,6 +160,48 @@ export default function RepoExplorer({ onDownloadFullZip }: RepoExplorerProps) {
           <button
             type="button"
             onClick={() => {
+              setSelectedPath('docs/INDIAN_MARKET_PLAYBOOK.md');
+              setViewMode('preview');
+            }}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              selectedPath === 'docs/INDIAN_MARKET_PLAYBOOK.md'
+                ? 'border-blue-700 bg-blue-50 text-blue-800'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            India Playbook
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedPath('prompts/indian-market-system-prompt.txt');
+              setViewMode('code');
+            }}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              selectedPath === 'prompts/indian-market-system-prompt.txt'
+                ? 'border-blue-700 bg-blue-50 text-blue-800'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            India Prompt
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedPath('examples/reliance-nse-case.md');
+              setViewMode('preview');
+            }}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              selectedPath === 'examples/reliance-nse-case.md'
+                ? 'border-blue-700 bg-blue-50 text-blue-800'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Reliance Case
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               setSelectedPath('scripts/qrce_validator.py');
               setViewMode('code');
             }}

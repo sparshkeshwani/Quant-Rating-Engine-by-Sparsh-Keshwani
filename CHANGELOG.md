@@ -2,6 +2,17 @@
 
 All notable changes to the **Quantitative Rating & Conversion Engine (QRCE)** are documented in this file.
 
+## [3.1.0] — 2026-10-23 (Production Grade — Dual Jurisdiction: US & Indian Markets)
+
+### Added
+- **Indian Stock Market (NSE & BSE) Support**: Comprehensive regulatory and microstructure analysis under the SEBI framework.
+- **SEBI LODR Regulation 33 & Ind AS 7 Audit**: Added `-20` point divergence penalty when concall EBITDA optimism conflicts with negative Free Cash Flow in Statement of Cash Flows or Trade Debtors outgrowing revenue by >15% YoY.
+- **Promoter Share Pledging Risk**: Added `-15` point systemic risk deduction when promoter pledged shares exceed 20% of their total holding.
+- **SEBI PIT Reg 7(2) & SAST Promoter Tracking**: Added promoter creeping acquisition bonus (`+10` pts for >₹25 Cr) and promoter dumping penalty (`-15` pts for >₹50 Cr).
+- **NSE Institutional & Derivatives Layer**: FII + DII delivery volume > 60% (`+10` pts), NSE F&O Ban (>95% MWPL) & Put-Call Ratio spikes (`-10` pts).
+- **India Macroeconomic Filters**: RBI Monetary Policy Committee (MPC) repo stance, India CPI inflation, Brent crude oil shock (> $90/bbl on import cyclicals, `-10` pts), and domestic Union Budget capex push (`+10` pts).
+- **Indian Market Playbook & Examples**: Added `docs/INDIAN_MARKET_PLAYBOOK.md`, `prompts/indian-market-system-prompt.txt`, `examples/reliance-nse-case.md`, and `examples/hdfcbank-nse-case.md`.
+
 ## [3.0.0] — 2026-10-23 (Production Grade)
 
 ### Added

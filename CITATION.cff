@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use the Quantitative Rating & Conversion Engine (QRCE) skill or scoring methodology, please cite it as below."
-title: "Quantitative Rating & Conversion Engine (QRCE)"
-version: 3.0.0
+title: "Quantitative Rating & Conversion Engine (QRCE): Dual Jurisdiction (US & Indian Stock Markets)"
+version: 3.1.0
 date-released: 2026-10-23
 license: MIT
 type: software
@@ -11,7 +11,11 @@ authors:
 keywords:
   - quantitative-finance
   - equity-research
-  - llm-skills
-  - system-prompts
+  - indian-stock-market
+  - nse-india
+  - bse-sensex
+  - sebi-lodr
   - sec-edgar
   - multi-factor-scoring
+  - llm-skills
+  - prompt-engineering

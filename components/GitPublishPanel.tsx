@@ -18,16 +18,22 @@ export default function GitPublishPanel({ onDownloadFullZip }: GitPublishPanelPr
   const safeSlug = repoSlug.trim() || 'qrce-skill';
 
   const cliScript = [
-    `# 1. Unzip the downloaded QRCE v3.0.0 repository archive`,
-    `unzip qrce-skill-v3.0.0.zip && cd qrce-skill`,
+    `# 1. Unzip the downloaded QRCE v3.1.0 dual-market repository archive`,
+    `unzip qrce-skill-v3.1.0.zip && cd qrce-skill`,
     ``,
-    `# 2. Initialize Git and verify deterministic CQS test case`,
-    `python3 scripts/qrce_validator.py --ticker NVDA --name "NVIDIA Corporation" --regime bull_growth --fin 92 --grw 95 --val 15 --sen 82 --rsk 70 --consensus beat --options bullish_darkpool`,
+    `# 2. Verify deterministic CQS math for Indian & US Equities:`,
+    `# Test Indian Stock Market (Reliance Industries on NSE):`,
+    `python3 scripts/qrce_validator.py --ticker RELIANCE.NS --name "Reliance Industries" --market in --regime bull_growth --fin 75 --grw 82 --val 28 --sen 78 --rsk 85 --consensus beat --options fii_dii_delivery --macro-filter india_capex`,
+    ``,
+    `# Test US Equity (NVIDIA Corp on NASDAQ):`,
+    `python3 scripts/qrce_validator.py --ticker NVDA --name "NVIDIA Corporation" --market us --regime bull_growth --fin 92 --grw 95 --val 15 --sen 82 --rsk 70 --consensus beat --options bullish_darkpool`,
+    ``,
+    `# 3. Initialize Git and commit`,
     `git init -b main`,
     `git add .`,
-    `git commit -m "feat: release Quantitative Rating & Conversion Engine (QRCE v3.0.0)"`,
+    `git commit -m "feat: release QRCE v3.1.0 with Indian Stock Market (NSE/BSE) support"`,
     ``,
-    `# 3. Create & push directly to GitHub via GitHub CLI`,
+    `# 4. Create & push directly to GitHub via GitHub CLI`,
     `gh repo create ${safeOwner}/${safeSlug} --${visibility} --source=. --remote=origin --push`,
   ].join('\n');
 
@@ -122,7 +128,7 @@ export default function GitPublishPanel({ onDownloadFullZip }: GitPublishPanelPr
                   className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-blue-800 whitespace-nowrap"
                 >
                   <Download className="h-4 w-4" />
-                  <span>Download qrce-skill-v3.0.0.zip ({REPO_FILES.length} Files)</span>
+                  <span>Download qrce-skill-v3.1.0.zip ({REPO_FILES.length} Files)</span>
                 </button>
 
                 <a

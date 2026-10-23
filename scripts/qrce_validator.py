@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Quantitative Rating & Conversion Engine (QRCE v3.0.0) — Reference CLI Validator
+Quantitative Rating & Conversion Engine (QRCE v3.0.0) — Dual-Market Reference CLI Validator
 Author: Sparsh Keshwani
 License: MIT
+Supports: US Equities (SEC EDGAR) & Indian Equities (NSE & BSE / SEBI)
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ REGIME_WEIGHTS: dict[str, tuple[str, dict[str, float]]] = {
 class QRCEInput:
     ticker: str
     name: str
+    market: str  # "us" or "in"
     regime: str
     fin: float
     grw: float
@@ -30,10 +32,11 @@ class QRCEInput:
     rsk: float
     xbrl_divergence: bool = False
     consensus: str = "none"  # none | beat | miss
-    insider: str = "neutral"  # neutral | sell_divergence | buy_alignment
+    insider: str = "neutral"  # neutral | sell_divergence | buy_alignment | promoter_buy | promoter_sell
+    promoter_pledge_high: bool = False
     high_short_interest: bool = False
-    options: str = "neutral"  # neutral | bearish_pcr | bullish_darkpool
-    macro_filter: str = "none"  # none | cyclical_penalty | defensive_bonus
+    options: str = "neutral"  # neutral | bearish_pcr | bullish_darkpool | fii_dii_delivery | fii_outflow
+    macro_filter: str = "none"  # none | cyclical_penalty | defensive_bonus | rbi_hawkish | india_capex
 
 
 def fmt_signed(val: float, decimals: int = 1) -> str:
@@ -47,6 +50,8 @@ def fmt_int_signed(val: int) -> str:
 
 def evaluate_qrce(data: QRCEInput) -> str:
     regime_label, w = REGIME_WEIGHTS[data.regime]
+    is_india = data.market.lower() in ("in", "india", "nse", "bse")
+
     for key, score in [("fin", data.fin), ("grw", data.grw), ("val", data.val), ("sen", data.sen), ("rsk", data.rsk)]:
         if not -100.0 <= score <= 100.0:
             raise ValueError(f"Sub-score {key}={score} must be within [-100, +100].")
@@ -61,13 +66,30 @@ def evaluate_qrce(data: QRCEInput) -> str:
     delta_hard = (-20 if data.xbrl_divergence else 0) + (
         10 if data.consensus == "beat" else -15 if data.consensus == "miss" else 0
     )
-    delta_insider = -15 if data.insider == "sell_divergence" else 10 if data.insider == "buy_alignment" else 0
-    delta_options = (-10 if data.high_short_interest else 0) + (
-        -5 if data.options == "bearish_pcr" else 10 if data.options == "bullish_darkpool" else 0
-    )
-    delta_macro = -10 if data.macro_filter == "cyclical_penalty" else 10 if data.macro_filter == "defensive_bonus" else 0
 
-    raw_cqs = base_sum + delta_hard + delta_insider + delta_options + delta_macro
+    delta_insider = 0
+    if data.insider in ("sell_divergence", "promoter_sell"):
+        delta_insider = -15
+    elif data.insider in ("buy_alignment", "promoter_buy"):
+        delta_insider = 10
+
+    delta_pledge = -15 if (is_india and data.promoter_pledge_high) else 0
+
+    delta_options = 0
+    if data.high_short_interest:
+        delta_options -= 10
+    if data.options in ("bearish_pcr", "fii_outflow"):
+        delta_options -= 5
+    elif data.options in ("bullish_darkpool", "fii_dii_delivery"):
+        delta_options += 10
+
+    delta_macro = 0
+    if data.macro_filter in ("cyclical_penalty", "rbi_hawkish"):
+        delta_macro -= 10
+    elif data.macro_filter in ("defensive_bonus", "india_capex"):
+        delta_macro += 10
+
+    raw_cqs = base_sum + delta_hard + delta_insider + delta_pledge + delta_options + delta_macro
     cqs = max(-100.0, min(100.0, round(raw_cqs, 1)))
 
     if cqs >= 65:
@@ -82,12 +104,31 @@ def evaluate_qrce(data: QRCEInput) -> str:
         rating, stance, horizon, conf = "HOLD", "Hold", "Neutral", round(60 + (1 - abs(cqs) / 20) * 14)
 
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    market_header = "JURISDICTION   : INDIA (NSE & BSE / SEBI LODR REG 33 & PIT REG 7)" if is_india else "JURISDICTION   : US & GLOBAL (SEC EDGAR / NYSE / NASDAQ / FORM 4)"
+    hard_data_title = "- BSE/NSE LODR Reg 33 & Ind AS 7 Check " if is_india else "- SEC EDGAR / Consensus Verification   "
+    insider_title = "- SEBI PIT Reg 7(2) Promoter Action    " if is_india else "- Form 4 Insider Trading Alignment     "
+    options_title = "- NSE F&O, MWPL & FII/DII Delivery     " if is_india else "- Short Interest / Options Sentiment   "
+    macro_title = "- RBI MPC & India Macro Normalization  " if is_india else "- Macro & Sector Normalization         "
+
+    adj_lines = [
+        f"{hard_data_title}: {fmt_int_signed(delta_hard)} Points",
+        f"{insider_title}: {fmt_int_signed(delta_insider)} Points",
+    ]
+    if is_india:
+        adj_lines.append(f"- Promoter Share Pledge Risk (>20%)     : {fmt_int_signed(delta_pledge)} Points")
+    adj_lines.extend([
+        f"{options_title}: {fmt_int_signed(delta_options)} Points",
+        f"{macro_title}: {fmt_int_signed(delta_macro)} Points",
+    ])
+
     return "\n".join([
         "=" * 80,
         "                        QUANTITATIVE ANALYSIS ENGINE                            ",
         "=" * 80,
         "AUTHOR          : Sparsh Keshwani",
         f"TICKER / NAME   : {data.ticker.upper()} / {data.name}",
+        market_header,
         f"MACRO REGIME    : {regime_label}",
         f"TIMESTAMP       : {ts}",
         "-" * 80,
@@ -108,10 +149,7 @@ def evaluate_qrce(data: QRCEInput) -> str:
         "",
         "HARD DATA & ALT-DATA ADJUSTMENTS",
         "-" * 80,
-        f"- SEC EDGAR / Consensus Verification : {fmt_int_signed(delta_hard)} Points",
-        f"- Form 4 Insider Trading Alignment   : {fmt_int_signed(delta_insider)} Points",
-        f"- Short Interest / Options Sentiment : {fmt_int_signed(delta_options)} Points",
-        f"- Macro & Sector Normalization       : {fmt_int_signed(delta_macro)} Points",
+        *adj_lines,
         "-" * 80,
         "",
         "RECOMMENDED ACTIONABLE THRESHOLD:",
@@ -122,26 +160,29 @@ def evaluate_qrce(data: QRCEInput) -> str:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="QRCE v3.0.0 Deterministic Score Validator")
+    parser = argparse.ArgumentParser(description="QRCE v3.0.0 Dual-Market Score Validator")
     parser.add_argument("--ticker", required=True)
     parser.add_argument("--name", default="Public Equity")
+    parser.add_argument("--market", choices=["us", "in"], default="us", help="Market jurisdiction: 'us' (SEC) or 'in' (NSE/BSE)")
     parser.add_argument("--regime", choices=list(REGIME_WEIGHTS.keys()), default="baseline")
     parser.add_argument("--fin", type=float, required=True)
     parser.add_argument("--grw", type=float, required=True)
     parser.add_argument("--val", type=float, required=True)
     parser.add_argument("--sen", type=float, required=True)
     parser.add_argument("--rsk", type=float, required=True)
-    parser.add_argument("--xbrl-divergence", action="store_true")
+    parser.add_argument("--xbrl-divergence", action="store_true", help="10-Q/10-K or LODR Reg 33 FCF/Receivables divergence (-20)")
     parser.add_argument("--consensus", choices=["none", "beat", "miss"], default="none")
-    parser.add_argument("--insider", choices=["neutral", "sell_divergence", "buy_alignment"], default="neutral")
-    parser.add_argument("--high-short-interest", action="store_true")
-    parser.add_argument("--options", choices=["neutral", "bearish_pcr", "bullish_darkpool"], default="neutral")
-    parser.add_argument("--macro-filter", choices=["none", "cyclical_penalty", "defensive_bonus"], default="none")
+    parser.add_argument("--insider", choices=["neutral", "sell_divergence", "buy_alignment", "promoter_buy", "promoter_sell"], default="neutral")
+    parser.add_argument("--promoter-pledge", action="store_true", help="High promoter pledge > 20% (-15, India only)")
+    parser.add_argument("--high-short-interest", action="store_true", help="High short interest or NSE F&O ban (-10)")
+    parser.add_argument("--options", choices=["neutral", "bearish_pcr", "bullish_darkpool", "fii_dii_delivery", "fii_outflow"], default="neutral")
+    parser.add_argument("--macro-filter", choices=["none", "cyclical_penalty", "defensive_bonus", "rbi_hawkish", "india_capex"], default="none")
     args = parser.parse_args()
 
     print(evaluate_qrce(QRCEInput(
         ticker=args.ticker,
         name=args.name,
+        market=args.market,
         regime=args.regime,
         fin=args.fin,
         grw=args.grw,
@@ -151,6 +192,7 @@ if __name__ == "__main__":
         xbrl_divergence=args.xbrl_divergence,
         consensus=args.consensus,
         insider=args.insider,
+        promoter_pledge_high=args.promoter_pledge,
         high_short_interest=args.high_short_interest,
         options=args.options,
         macro_filter=args.macro_filter,

@@ -1,15 +1,21 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Check, Copy, RotateCcw } from 'lucide-react';
+import { Check, Copy, RotateCcw, Zap } from 'lucide-react';
 import {
   MACRO_REGIMES,
   MacroRegimeKey,
+  MarketJurisdiction,
   PRESET_SCENARIOS,
   QRCESimulatorInput,
   RatingLabel,
   calculateQRCE,
 } from '@/lib/qrce-engine';
+import { LiveStockData } from './RealtimeStockService';
+
+interface QRCESimulatorProps {
+  externalStock?: LiveStockData | null;
+}
 
 const RATING_SPECTRUM: Array<{
   label: RatingLabel;
@@ -43,30 +49,155 @@ const RATING_SPECTRUM: Array<{
   },
 ];
 
-export default function QRCESimulator() {
-  const [activePresetId, setActivePresetId] = useState<string>(PRESET_SCENARIOS[0].id);
-  const [simState, setSimState] = useState<QRCESimulatorInput>(PRESET_SCENARIOS[0].input);
+export default function QRCESimulator({ externalStock }: QRCESimulatorProps = {}) {
+  const [selectedJurisdiction, setSelectedJurisdiction] =
+    useState<MarketJurisdiction>(() => externalStock?.jurisdiction ?? 'india_nse_bse');
+  const [activePresetId, setActivePresetId] = useState<string>(() =>
+    externalStock ? 'live-custom' : 'reliance-nse'
+  );
+  const [liveStockInfo] = useState<LiveStockData | null>(() => externalStock ?? null);
+  const [simState, setSimState] = useState<QRCESimulatorInput>(() => {
+    if (externalStock) {
+      return {
+        ticker: externalStock.symbol,
+        companyName: externalStock.companyName,
+        jurisdiction: externalStock.jurisdiction,
+        regime: 'baseline',
+        scores: {
+          fin: externalStock.suggestedFactorScores.fin,
+          grw: externalStock.suggestedFactorScores.grw,
+          val: externalStock.suggestedFactorScores.val,
+          sen: externalStock.suggestedFactorScores.sen,
+          rsk: externalStock.suggestedFactorScores.rsk,
+        },
+        hardData: {
+          xbrlDivergencePenalty: false,
+          consensusModifier: 'none',
+        },
+        altData: {
+          insiderStatus: 'neutral',
+          promoterPledgeHigh: false,
+          shortInterestHigh: false,
+          optionsFlow:
+            externalStock.volume > externalStock.averageVolume * 1.25
+              ? externalStock.jurisdiction === 'india_nse_bse'
+                ? 'fii_dii_delivery_bullish'
+                : 'bullish_pcr_lt_0_6_darkpool'
+              : 'neutral',
+        },
+        macroFilter: 'none',
+        drivers: {
+          bullFactor: `Live market price ${externalStock.currency === 'INR' ? '₹' : '$'}${externalStock.price} (${externalStock.exchange}) trading at ${externalStock.position52WeekPct.toFixed(1)}% of 52-week high.`,
+          bearFactor: `Recent 1-month trajectory: ${externalStock.monthReturnPct >= 0 ? '+' : ''}${externalStock.monthReturnPct.toFixed(2)}%.`,
+          insiderSignal:
+            externalStock.jurisdiction === 'india_nse_bse'
+              ? 'SEBI PIT promoter disclosures neutral; verify quarterly shareholding pledge.'
+              : 'SEC Form 4 disclosures neutral; no recent major executive dispositions.',
+          criticalCatalyst: 'Awaiting next quarterly earnings concall and audited cash flow report.',
+        },
+      };
+    }
+    const rel = PRESET_SCENARIOS.find((p) => p.id === 'reliance-nse');
+    return rel ? rel.input : PRESET_SCENARIOS[0].input;
+  });
   const [copiedReport, setCopiedReport] = useState<boolean>(false);
   const [copiedTestPrompt, setCopiedTestPrompt] = useState<boolean>(false);
 
-  const activePreset = useMemo(
-    () => PRESET_SCENARIOS.find((p) => p.id === activePresetId) || PRESET_SCENARIOS[0],
-    [activePresetId]
-  );
+  const isIndia = simState.jurisdiction === 'india_nse_bse';
+
+  const visiblePresets = useMemo(() => {
+    return PRESET_SCENARIOS.filter(
+      (p) => p.jurisdiction === selectedJurisdiction
+    );
+  }, [selectedJurisdiction]);
+
+  const activePreset = useMemo(() => {
+    if (activePresetId === 'live-custom' && liveStockInfo) {
+      return {
+        id: 'live-custom',
+        jurisdiction: liveStockInfo.jurisdiction,
+        label: `Live: ${liveStockInfo.symbol}`,
+        summary: `Live quote from ${liveStockInfo.exchange} (${liveStockInfo.companyName})`,
+        sampleUserPrompt: `Analyze ${liveStockInfo.symbol} with QRCE v3.1.0 using live quote data.`,
+        input: simState,
+      };
+    }
+    return (
+      PRESET_SCENARIOS.find((p) => p.id === activePresetId) ||
+      visiblePresets[0] ||
+      PRESET_SCENARIOS[0]
+    );
+  }, [activePresetId, liveStockInfo, simState, visiblePresets]);
 
   const computed = useMemo(() => calculateQRCE(simState), [simState]);
   const currentWeights = MACRO_REGIMES[simState.regime].weights;
 
+  const handleSelectJurisdiction = (jur: MarketJurisdiction) => {
+    setSelectedJurisdiction(jur);
+    const firstInJur = PRESET_SCENARIOS.find((p) => p.jurisdiction === jur);
+    if (firstInJur) {
+      setActivePresetId(firstInJur.id);
+      setSimState(firstInJur.input);
+    }
+  };
+
   const handleSelectPreset = (presetId: string) => {
+    if (presetId === 'live-custom' && liveStockInfo) {
+      setActivePresetId('live-custom');
+      setSelectedJurisdiction(liveStockInfo.jurisdiction);
+      return;
+    }
     const found = PRESET_SCENARIOS.find((p) => p.id === presetId);
     if (found) {
       setActivePresetId(found.id);
+      setSelectedJurisdiction(found.jurisdiction);
       setSimState(found.input);
     }
   };
 
   const handleReset = () => {
-    setSimState(activePreset.input);
+    if (activePresetId === 'live-custom' && liveStockInfo) {
+      setSimState({
+        ticker: liveStockInfo.symbol,
+        companyName: liveStockInfo.companyName,
+        jurisdiction: liveStockInfo.jurisdiction,
+        regime: 'baseline',
+        scores: {
+          fin: liveStockInfo.suggestedFactorScores.fin,
+          grw: liveStockInfo.suggestedFactorScores.grw,
+          val: liveStockInfo.suggestedFactorScores.val,
+          sen: liveStockInfo.suggestedFactorScores.sen,
+          rsk: liveStockInfo.suggestedFactorScores.rsk,
+        },
+        hardData: {
+          xbrlDivergencePenalty: false,
+          consensusModifier: 'none',
+        },
+        altData: {
+          insiderStatus: 'neutral',
+          promoterPledgeHigh: false,
+          shortInterestHigh: false,
+          optionsFlow:
+            liveStockInfo.volume > liveStockInfo.averageVolume * 1.25
+              ? liveStockInfo.jurisdiction === 'india_nse_bse'
+                ? 'fii_dii_delivery_bullish'
+                : 'bullish_pcr_lt_0_6_darkpool'
+              : 'neutral',
+        },
+        macroFilter: 'none',
+        drivers: {
+          bullFactor: `Live market price ${liveStockInfo.currency === 'INR' ? '₹' : '$'}${liveStockInfo.price} (${liveStockInfo.exchange}) trading at ${liveStockInfo.position52WeekPct.toFixed(1)}% of 52-week high.`,
+          bearFactor: `Recent 1-month trajectory: ${liveStockInfo.monthReturnPct >= 0 ? '+' : ''}${liveStockInfo.monthReturnPct.toFixed(2)}%.`,
+          insiderSignal:
+            liveStockInfo.jurisdiction === 'india_nse_bse'
+              ? 'SEBI PIT promoter disclosures neutral; verify quarterly shareholding pledge.'
+              : 'SEC Form 4 disclosures neutral; no recent major executive dispositions.',
+          criticalCatalyst: 'Awaiting next quarterly earnings concall and audited cash flow report.',
+        },
+      });
+    } else {
+      setSimState(activePreset.input);
+    }
   };
 
   const updateScore = (key: keyof QRCESimulatorInput['scores'], val: number) => {
@@ -140,34 +271,78 @@ export default function QRCESimulator() {
       <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
           <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-slate-900">
-            03. Deterministic CQS Formula Simulator & Benchmark Sandbox
+            03. Deterministic CQS Formula Simulator &amp; Multi-Market Sandbox
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            Audit how dynamic regime weights ($W_1 \dots W_5$) and SEC XBRL / Form 4 $\Delta$
-            adjustments transform sub-scores into the mandatory 80-column terminal report.
+            Audit how dynamic regime weights ($W_1 \dots W_5$) and regulatory $\Delta$ adjustments
+            (BSE/NSE LODR Reg 33, SEBI PIT Promoter Pledges, or SEC EDGAR Form 4) determine the
+            final institutional rating.
           </p>
         </div>
 
-        {/* Preset Scenario Buttons */}
-        <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
-          {PRESET_SCENARIOS.map((preset) => {
-            const active = preset.id === activePresetId;
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => handleSelectPreset(preset.id)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                  active
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {preset.label}
-              </button>
-            );
-          })}
+        {/* Market Jurisdiction Selector (Clean Segmented Control) */}
+        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1">
+          <button
+            type="button"
+            onClick={() => handleSelectJurisdiction('india_nse_bse')}
+            className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+              selectedJurisdiction === 'india_nse_bse'
+                ? 'bg-blue-700 text-white shadow-xs'
+                : 'text-slate-700 hover:text-slate-900'
+            }`}
+          >
+            Indian Equities (NSE / BSE / SEBI)
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSelectJurisdiction('us_global')}
+            className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+              selectedJurisdiction === 'us_global'
+                ? 'bg-blue-700 text-white shadow-xs'
+                : 'text-slate-700 hover:text-slate-900'
+            }`}
+          >
+            US &amp; Global (SEC / NYSE / NASDAQ)
+          </button>
         </div>
+      </div>
+
+      {/* Preset Scenarios Strip */}
+      <div className="mb-4 flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+        <span className="px-3 py-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          Presets:
+        </span>
+        {liveStockInfo && (
+          <button
+            type="button"
+            onClick={() => handleSelectPreset('live-custom')}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+              activePresetId === 'live-custom'
+                ? 'bg-blue-700 text-white shadow-xs'
+                : 'border border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100'
+            }`}
+          >
+            <Zap className="h-3 w-3" />
+            <span>Live: {liveStockInfo.symbol}</span>
+          </button>
+        )}
+        {visiblePresets.map((preset) => {
+          const active = preset.id === activePresetId;
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => handleSelectPreset(preset.id)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                active
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              {preset.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Single-Elevation Split Workspace */}
@@ -177,6 +352,10 @@ export default function QRCESimulator() {
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex flex-wrap items-center gap-2 text-slate-600">
               <span className="font-semibold text-slate-900">{simState.ticker}</span>
+              <span aria-hidden="true">·</span>
+              <span className="font-medium text-slate-700">
+                {isIndia ? 'NSE / BSE Jurisdiction' : 'SEC EDGAR Jurisdiction'}
+              </span>
               <span aria-hidden="true">·</span>
               <span>{activePreset.summary}</span>
             </div>
@@ -220,12 +399,12 @@ export default function QRCESimulator() {
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label htmlFor="sim-ticker" className="block text-xs font-semibold text-slate-700">
-                    Ticker
+                    Ticker {isIndia ? '(NSE/BSE)' : '(US)'}
                   </label>
                   <input
                     id="sim-ticker"
                     type="text"
-                    maxLength={8}
+                    maxLength={16}
                     value={simState.ticker}
                     onChange={(e) =>
                       setSimState((prev) => ({ ...prev, ticker: e.target.value.toUpperCase() }))
@@ -273,7 +452,9 @@ export default function QRCESimulator() {
                   ))}
                 </select>
                 <p className="mt-1.5 text-xs text-slate-500">
-                  {MACRO_REGIMES[simState.regime].description}
+                  {isIndia
+                    ? MACRO_REGIMES[simState.regime].indiaDescription
+                    : MACRO_REGIMES[simState.regime].description}
                 </p>
               </div>
             </div>
@@ -327,14 +508,20 @@ export default function QRCESimulator() {
               })}
             </div>
 
-            {/* Hard Data, Form 4, & Macro Correction Layer */}
+            {/* Hard Data, Insider/Promoter, & Macro Correction Layer */}
             <div className="space-y-3.5 p-6">
               <div className="text-xs font-semibold text-slate-900">
-                SEC EDGAR, Form 4 & Macro Correction Layer (Δ)
+                {isIndia
+                  ? 'BSE/NSE LODR Reg 33, SEBI PIT & RBI Correction Layer (Δ)'
+                  : 'SEC EDGAR, Form 4 & Macro Correction Layer (Δ)'}
               </div>
 
               <label className="flex cursor-pointer items-center justify-between gap-2 text-xs text-slate-700">
-                <span>XBRL Divergence (Profit spin vs. FCF &lt; 0)</span>
+                <span>
+                  {isIndia
+                    ? 'LODR Reg 33 & Ind AS 7 Divergence (EBITDA spin vs FCF < 0 or Trade Debtors surge >15%)'
+                    : 'XBRL Divergence (Profit spin vs. FCF < 0 or AR growing faster than revenue)'}
+                </span>
                 <div className="flex items-center gap-2">
                   <span className="font-[family-name:var(--font-mono)] text-red-700 tabular-nums">
                     -20 pts
@@ -362,7 +549,7 @@ export default function QRCESimulator() {
                     htmlFor="sim-consensus"
                     className="block text-[11px] font-medium text-slate-600"
                   >
-                    Consensus Discrepancy
+                    Consensus Surprise
                   </label>
                   <select
                     id="sim-consensus"
@@ -379,9 +566,9 @@ export default function QRCESimulator() {
                     }
                     className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900"
                   >
-                    <option value="none">In-Line (0 pts)</option>
-                    <option value="beat_gt_5">Beat &gt; 5% (+10 pts)</option>
-                    <option value="miss_gt_3">Miss &gt; 3% (-15 pts)</option>
+                    <option value="none">In-Line Consensus (0 pts)</option>
+                    <option value="beat_gt_5">Beat &gt; 5% PAT/Rev (+10 pts)</option>
+                    <option value="miss_gt_3">Miss &gt; 3% PAT/Rev (-15 pts)</option>
                   </select>
                 </div>
 
@@ -390,7 +577,7 @@ export default function QRCESimulator() {
                     htmlFor="sim-insider"
                     className="block text-[11px] font-medium text-slate-600"
                   >
-                    Form 4 Insider Signal
+                    {isIndia ? 'SEBI PIT Promoter Action' : 'Form 4 Insider Signal'}
                   </label>
                   <select
                     id="sim-insider"
@@ -407,9 +594,18 @@ export default function QRCESimulator() {
                     }
                     className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900"
                   >
-                    <option value="neutral">Neutral / 10b5-1 (0 pts)</option>
-                    <option value="alignment_buy_500k">CEO/CFO Buy &gt;$500k (+10)</option>
-                    <option value="divergence_sell_5m">C-Suite Sell &gt;$5M (-15)</option>
+                    <option value="neutral">Neutral / Scheduled (0 pts)</option>
+                    {isIndia ? (
+                      <>
+                        <option value="promoter_buy_25cr">Promoter Creep Buy &gt; ₹25 Cr (+10)</option>
+                        <option value="promoter_sell_50cr">Promoter Block Dump &gt; ₹50 Cr (-15)</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="alignment_buy_500k">CEO/CFO Buy &gt;$500k (+10)</option>
+                        <option value="divergence_sell_5m">C-Suite Sell &gt;$5M (-15)</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -418,7 +614,7 @@ export default function QRCESimulator() {
                     htmlFor="sim-options"
                     className="block text-[11px] font-medium text-slate-600"
                   >
-                    Options & Dark Pool Flow
+                    {isIndia ? 'NSE F&O / FII-DII Delivery' : 'Options & Dark Pool Flow'}
                   </label>
                   <select
                     id="sim-options"
@@ -435,9 +631,19 @@ export default function QRCESimulator() {
                     }
                     className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900"
                   >
-                    <option value="neutral">Neutral PCR (0 pts)</option>
-                    <option value="bullish_pcr_lt_0_6_darkpool">PCR &lt; 0.6 + Dark Pool (+10)</option>
-                    <option value="bearish_pcr_gt_1_5">PCR &gt; 1.5 Spike (-5)</option>
+                    <option value="neutral">Neutral Flow (0 pts)</option>
+                    {isIndia ? (
+                      <>
+                        <option value="fii_dii_delivery_bullish">FII+DII Delivery &gt; 60% (+10)</option>
+                        <option value="bearish_pcr_gt_1_5">NSE F&amp;O PCR &gt; 1.4 Spike (-5)</option>
+                        <option value="fii_heavy_outflow_bearish">FII Heavy Outflow Dump (-5)</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="bullish_pcr_lt_0_6_darkpool">PCR &lt; 0.6 + Dark Pool (+10)</option>
+                        <option value="bearish_pcr_gt_1_5">PCR &gt; 1.5 Bearish Spike (-5)</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
@@ -446,7 +652,7 @@ export default function QRCESimulator() {
                     htmlFor="sim-macro"
                     className="block text-[11px] font-medium text-slate-600"
                   >
-                    Macro Sector Filter
+                    {isIndia ? 'India Macro / RBI Context' : 'Macro Sector Filter'}
                   </label>
                   <select
                     id="sim-macro"
@@ -460,14 +666,55 @@ export default function QRCESimulator() {
                     className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900"
                   >
                     <option value="none">Neutral Sector (0 pts)</option>
-                    <option value="defensive_bonus">High-Rate Defensive (+10)</option>
-                    <option value="cyclical_downside">PMI &lt; 48 Cyclical (-10)</option>
+                    {isIndia ? (
+                      <>
+                        <option value="india_capex_boom">India Capex / Govt Push (+10)</option>
+                        <option value="defensive_bonus">High-Rate Banking / FMCG (+10)</option>
+                        <option value="rbi_hawkish_crude_shock">Crude &gt; $90 / Hawkish RBI (-10)</option>
+                        <option value="cyclical_downside">Rupee Depreciation / Import Drag (-10)</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="defensive_bonus">High-Rate Defensive (+10)</option>
+                        <option value="cyclical_downside">PMI &lt; 48 Cyclical Drag (-10)</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
 
+              {/* India specific: Promoter Pledge Toggle */}
+              {isIndia && (
+                <label className="flex cursor-pointer items-center justify-between gap-2 pt-1 text-xs text-slate-700">
+                  <span>Promoter Share Pledge &gt; 20% (Lender Margin Call / Liquidity Risk)</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-[family-name:var(--font-mono)] text-red-700 tabular-nums">
+                      -15 pts
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={simState.altData.promoterPledgeHigh}
+                      onChange={(e) =>
+                        setSimState((prev) => ({
+                          ...prev,
+                          altData: {
+                            ...prev.altData,
+                            promoterPledgeHigh: e.target.checked,
+                          },
+                        }))
+                      }
+                      className="h-4 w-4 rounded border-slate-300 text-blue-700"
+                    />
+                  </div>
+                </label>
+              )}
+
               <label className="flex cursor-pointer items-center justify-between gap-2 pt-1 text-xs text-slate-700">
-                <span>Short Interest &gt; 15% Float &amp; Days-to-Cover &gt; 6</span>
+                <span>
+                  {isIndia
+                    ? 'NSE F&O Ban (>95% MWPL) or Extreme Bearish Short Buildup'
+                    : 'Short Interest > 15% Float & Days-to-Cover > 6'}
+                </span>
                 <div className="flex items-center gap-2">
                   <span className="font-[family-name:var(--font-mono)] text-red-700 tabular-nums">
                     -10 pts
@@ -518,7 +765,7 @@ export default function QRCESimulator() {
                   ) : (
                     <Copy className="h-3.5 w-3.5" />
                   )}
-                  <span>{copiedTestPrompt ? 'Prompt Copied' : 'Copy Chatbot Test Prompt'}</span>
+                  <span>{copiedTestPrompt ? 'Prompt Copied' : 'Copy Chatbot Prompt'}</span>
                 </button>
 
                 <button
@@ -544,7 +791,7 @@ export default function QRCESimulator() {
 
             <div className="border-t border-slate-800 bg-slate-900/60 px-6 py-4 text-xs text-slate-400">
               <div className="font-medium text-slate-300">
-                Sample User Prompt for Benchmarking Your Chatbot ({simState.ticker}):
+                Sample Test Prompt for Chatbot / LLM ({simState.ticker}):
               </div>
               <p className="mt-1 leading-relaxed text-slate-400">{activePreset.sampleUserPrompt}</p>
             </div>

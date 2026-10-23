@@ -9,9 +9,12 @@ import RepoExplorer from './RepoExplorer';
 import ChatbotAdapterStudio from './ChatbotAdapterStudio';
 import QRCESimulator from './QRCESimulator';
 import GitPublishPanel from './GitPublishPanel';
+import RealtimeStockService, { LiveStockData } from './RealtimeStockService';
 
 export default function QRCEWorkspace() {
   const [copiedUniversal, setCopiedUniversal] = useState<boolean>(false);
+  const [copiedIndia, setCopiedIndia] = useState<boolean>(false);
+  const [transferredStock, setTransferredStock] = useState<LiveStockData | null>(null);
 
   const handleDownloadFullZip = () => {
     const entries = REPO_FILES.map((file) => ({
@@ -19,15 +22,23 @@ export default function QRCEWorkspace() {
       content: file.content,
     }));
     const zipBlob = createZipBlob(entries, 'qrce-skill');
-    triggerBlobDownload(zipBlob, 'qrce-skill-v3.0.0.zip');
+    triggerBlobDownload(zipBlob, 'qrce-skill-v3.1.0.zip');
   };
 
-  const handleCopyQuickSkill = () => {
+  const handleCopyUniversal = () => {
     const universal =
       REPO_FILES.find((f) => f.path === 'prompts/universal-system-prompt.txt') || REPO_FILES[1];
     navigator.clipboard.writeText(universal.content);
     setCopiedUniversal(true);
     setTimeout(() => setCopiedUniversal(false), 1800);
+  };
+
+  const handleCopyIndiaPrompt = () => {
+    const india =
+      REPO_FILES.find((f) => f.path === 'prompts/indian-market-system-prompt.txt') || REPO_FILES[2];
+    navigator.clipboard.writeText(india.content);
+    setCopiedIndia(true);
+    setTimeout(() => setCopiedIndia(false), 1800);
   };
 
   return (
@@ -43,11 +54,17 @@ export default function QRCEWorkspace() {
             sparsh-keshwani / qrce-skill
           </a>
 
-          {/* Zone 2: 4 Concise Single-Line Nav Links */}
+          {/* Zone 2: Concise Single-Line Nav Links */}
           <nav
             aria-label="Primary navigation"
             className="hidden items-center gap-6 text-sm font-medium text-slate-600 md:flex"
           >
+            <a
+              href="#realtime"
+              className="transition-colors hover:text-slate-900 hover:underline underline-offset-4 whitespace-nowrap shrink-0"
+            >
+              Live Market Data
+            </a>
             <a
               href="#repository"
               className="transition-colors hover:text-slate-900 hover:underline underline-offset-4 whitespace-nowrap shrink-0"
@@ -82,7 +99,7 @@ export default function QRCEWorkspace() {
               className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-800 whitespace-nowrap shrink-0"
             >
               <Download className="h-3.5 w-3.5" />
-              <span>Download Repo (.zip)</span>
+              <span>Download Repo ({REPO_FILES.length} Files)</span>
             </button>
           </div>
         </div>
@@ -105,25 +122,27 @@ export default function QRCEWorkspace() {
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                     <span className="font-medium text-slate-700">Author: Sparsh Keshwani</span>
                     <span aria-hidden="true">·</span>
-                    <span>Version 3.0.0 (Production Grade)</span>
+                    <span className="font-semibold text-blue-800">
+                      Dual Jurisdiction: Indian Stock Market (NSE/BSE) &amp; US (SEC)
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>v3.1.0 Production Grade</span>
                     <span aria-hidden="true">·</span>
                     <span>MIT License</span>
-                    <span aria-hidden="true">·</span>
-                    <span>Agent Skill &amp; System Directive</span>
                   </div>
 
                   <h1 className="mt-4 max-w-2xl font-[family-name:var(--font-display)] text-3xl font-bold tracking-tight text-slate-900 [text-wrap:balance] sm:text-4xl lg:text-[42px] lg:leading-[1.14]">
-                    Quantitative Rating &amp; Conversion Engine for AI Chatbots and LLMs
+                    Quantitative Rating &amp; Conversion Engine for Indian &amp; Global Equities
                   </h1>
 
                   <p className="mt-4 max-w-[64ch] text-base leading-relaxed text-slate-600">
-                    An open-source multi-factor equity research skill that converts unstructured
-                    earnings transcripts, 10-K/10-Q filings, and alternative data into a bounded{' '}
+                    Institutional multi-factor equity research skill for online AI chatbots and LLMs.
+                    Converts earnings concalls, corporate filings (SEBI LODR Reg 33, Ind AS 7, SEC 10-K/10-Q),
+                    and market signals into a mathematically bounded{' '}
                     <span className="font-[family-name:var(--font-mono)] text-sm font-medium text-slate-900">
                       CQS ∈ [-100, +100]
                     </span>{' '}
-                    with SEC XBRL cash-flow verification, Form 4 insider cross-checks, and dynamic
-                    macroeconomic regime weighting.
+                    with promoter share pledge audits, FII/DII delivery checks, and dynamic macro regime weighting.
                   </p>
                 </div>
 
@@ -139,15 +158,28 @@ export default function QRCEWorkspace() {
 
                   <button
                     type="button"
-                    onClick={handleCopyQuickSkill}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50 whitespace-nowrap shrink-0"
+                    onClick={handleCopyIndiaPrompt}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50 whitespace-nowrap shrink-0"
+                  >
+                    {copiedIndia ? (
+                      <Check className="h-4 w-4 text-emerald-700" />
+                    ) : (
+                      <Copy className="h-4 w-4 text-slate-500" />
+                    )}
+                    <span>{copiedIndia ? 'Copied India Prompt' : 'Copy Indian Market Prompt'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyUniversal}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 whitespace-nowrap shrink-0"
                   >
                     {copiedUniversal ? (
                       <Check className="h-4 w-4 text-emerald-700" />
                     ) : (
                       <Copy className="h-4 w-4 text-slate-500" />
                     )}
-                    <span>{copiedUniversal ? 'Copied Universal Prompt' : 'Copy Universal Prompt'}</span>
+                    <span>{copiedUniversal ? 'Copied Universal Prompt' : 'Copy US/Global Prompt'}</span>
                   </button>
                 </div>
               </div>
@@ -218,29 +250,26 @@ export default function QRCEWorkspace() {
             <div className="mt-8 grid grid-cols-1 divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4">
               <div className="p-5">
                 <div className="font-[family-name:var(--font-mono)] text-lg font-bold text-slate-900 tabular-nums">
-                  4 Macro Regimes
+                  NSE/BSE + SEC Regimes
                 </div>
                 <div className="mt-1 text-xs leading-relaxed text-slate-600">
-                  Dynamic W1..W5 re-weighting across Baseline, High Rate, Bull Growth, and
-                  Stagflation cycles.
+                  Dynamic W1..W5 re-weighting across Indian RBI cycles, Union Budget capex, and US Fed monetary environments.
                 </div>
               </div>
               <div className="p-5">
                 <div className="font-[family-name:var(--font-mono)] text-lg font-bold text-slate-900 tabular-nums">
-                  -20 pt XBRL Audit
+                  LODR Reg 33 &amp; XBRL
                 </div>
                 <div className="mt-1 text-xs leading-relaxed text-slate-600">
-                  Automatic divergence deduction when bullish earnings spin conflicts with negative
-                  10-Q/10-K Free Cash Flow.
+                  -20 pt automatic deduction when management profit spin conflicts with Ind AS 7 / 10-Q Free Cash Flow.
                 </div>
               </div>
               <div className="p-5">
                 <div className="font-[family-name:var(--font-mono)] text-lg font-bold text-slate-900 tabular-nums">
-                  Form 4 &amp; Options Δ
+                  Promoter Pledge &amp; Form 4
                 </div>
                 <div className="mt-1 text-xs leading-relaxed text-slate-600">
-                  Cross-checks C-suite 90-day &gt;$5M insider selling (-15) vs. &gt;$500k
-                  open-market alignment buys (+10).
+                  -15 pt penalty on &gt;20% promoter pledge (margin call risk), plus SEBI PIT promoter creeping buy alignment.
                 </div>
               </div>
               <div className="p-5">
@@ -248,13 +277,15 @@ export default function QRCEWorkspace() {
                   {REPO_FILES.length} Repository Files
                 </div>
                 <div className="mt-1 text-xs leading-relaxed text-slate-600">
-                  Ready for Claude 3.5/3.7, ChatGPT GPT-4o/o3, Gemini 1.5/2.0, Perplexity, JSON
-                  Schema APIs, and Python CLI.
+                  Ready for Claude, ChatGPT, Gemini, Perplexity, with Indian Market Playbook, schemas, and CLI validator.
                 </div>
               </div>
             </div>
           </div>
         </section>
+
+        {/* Real-Time Market Data Service: NSE, BSE & US Equities */}
+        <RealtimeStockService onTransferToSimulator={(data) => setTransferredStock(data)} />
 
         {/* Section 1: Interactive GitHub Repository Explorer */}
         <RepoExplorer onDownloadFullZip={handleDownloadFullZip} />
@@ -263,7 +294,14 @@ export default function QRCEWorkspace() {
         <ChatbotAdapterStudio />
 
         {/* Section 3: Deterministic CQS Formula Simulator & Terminal Sandbox */}
-        <QRCESimulator />
+        <QRCESimulator
+          key={
+            transferredStock
+              ? `stock-${transferredStock.symbol}-${transferredStock.lastUpdated}`
+              : 'default-sim'
+          }
+          externalStock={transferredStock}
+        />
 
         {/* Section 4: Git Push & Archive Export */}
         <GitPublishPanel onDownloadFullZip={handleDownloadFullZip} />
@@ -274,7 +312,7 @@ export default function QRCEWorkspace() {
         <div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-4 px-4 text-xs text-slate-500 sm:flex-row sm:items-center sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-slate-800">
-              Quantitative Rating &amp; Conversion Engine (QRCE v3.0.0)
+              Quantitative Rating &amp; Conversion Engine (QRCE v3.1.0 Dual Jurisdiction)
             </span>
             <span aria-hidden="true">·</span>
             <span>Authored by Sparsh Keshwani</span>
@@ -282,6 +320,9 @@ export default function QRCEWorkspace() {
             <span>Released under MIT License</span>
           </div>
           <div className="flex items-center gap-5">
+            <a href="#realtime" className="hover:text-slate-900 hover:underline">
+              Live Data
+            </a>
             <a href="#repository" className="hover:text-slate-900 hover:underline">
               Repository Files
             </a>
